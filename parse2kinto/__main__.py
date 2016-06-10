@@ -1,14 +1,17 @@
+from __future__ import print_function
 import logging
 import sys
 
+from progressbar import (
+    AdaptiveETA, ProgressBar, BouncingBar, Percentage)
 from kinto_http import cli_utils
-from kinto_http.exceptions import KintoException
 
 from . import parse
 
 logger = logging.getLogger(__file__)
 
 PARSE_DEFAULT_SERVER = 'https://api.parse.com'
+RECORD_PER_PAGES = 1000
 
 
 def main(args=None):
@@ -48,16 +51,30 @@ def main(args=None):
     #     if hasattr(e, 'response') and e.response.status_code == 412:
     #         raise KintoException("The collection already exists. Please "
     #                              "delete it first to make a clean import.")
-    
     kinto_client.create_collection(if_not_exists=True)
 
-    # Get parse records
-    records = parse_client.get_records()
-    
-    # Create kinto batch request
-    with kinto_client.batch() as batch:
-        for record in records:
-            batch.create_record(data=record)
+    # Count number of objects
+    count = parse_client.get_number_of_records()
+
+    pages = int(count / RECORD_PER_PAGES)
+    widgets = ['Import: ', Percentage(), ' ', BouncingBar(), ' ', AdaptiveETA()]
+
+    print("Importing %d records from %s" % (count, args.parse_class))
+
+    num_processed = 0
+
+    with ProgressBar(widgets=widgets, max_value=count) as p:
+        # Get parse records
+        p.update(num_processed)
+        for page in range(pages):
+            records = parse_client.get_records(page, RECORD_PER_PAGES)
+
+            # Create kinto batch request
+            with kinto_client.batch() as batch:
+                for record in records:
+                    batch.create_record(data=record)
+                    num_processed += 1
+            p.update(num_processed)
 
 
 if __name__ == '__main__':

@@ -44,7 +44,7 @@ distclean: clean
 maintainer-clean: distclean
 	rm -fr $(OBJECTS) .tox/ dist/ build/
 
-run-kinto:
+run-kinto: install
 	$(VENV)/bin/kinto --ini config/kinto.ini migrate
 	$(VENV)/bin/kinto --ini config/kinto.ini start
 

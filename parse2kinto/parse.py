@@ -44,7 +44,7 @@ class ParseClient(object):
         self.session.headers.update({
             "X-Parse-Application-Id": self._app_id,
             "X-Parse-REST-API-Key": self._rest_key,
-            "Content-Type": "application/json",
+            "Accept": "application/json",
         })
 
     def get_endpoint(self, name, class_name=None, id=None):
@@ -65,9 +65,19 @@ class ParseClient(object):
         }
         return self.endpoints.get(name, **kwargs)
 
-    def get_records(self, class_name=None):
+    def get_number_of_records(self, class_name=None):
         resp = self.session.get(self.get_endpoint('objects',
-                                                  class_name=class_name))
+                                                  class_name=class_name),
+                                data={"limit": 0, "count": 1})
+        resp.raise_for_status()
+        return resp.json()['count']
+
+    def get_records(self, page=0, records_per_page=100, class_name=None):
+        resp = self.session.get(self.get_endpoint('objects',
+                                                  class_name=class_name),
+                                data={"order": "createdAt",
+                                      "limit": records_per_page,
+                                      "skip": page * records_per_page})
         resp.raise_for_status()
         return resp.json()['results']
 
