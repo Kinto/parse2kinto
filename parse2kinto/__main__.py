@@ -5,7 +5,9 @@ import sys
 
 from progressbar import (
     AdaptiveETA, ProgressBar, BouncingBar, Percentage)
+
 from kinto_http import cli_utils
+from kinto_http.exceptions import KintoException
 
 from . import parse
 
@@ -57,28 +59,41 @@ def main(args=None):
     # Count number of objects
     count = parse_client.get_number_of_records()
 
-    pages = math.ceil(float(count) / RECORD_PER_PAGES)
+    pages = int(math.ceil(float(count) / RECORD_PER_PAGES))
     widgets = ['Import: ', Percentage(), ' ', BouncingBar(), ' ', AdaptiveETA()]
 
     print("Importing %d records from %s" % (count, args.parse_class))
 
     num_processed = 0
 
-    with ProgressBar(widgets=widgets, max_value=count) as p:
+    with ProgressBar(widgets=widgets, max_value=count) as progress:
         # Get parse records
-        p.update(num_processed)
+        progress.update(num_processed)
+
+        # Manual batch management mode.
+        p = kinto_client.batch()
+        batch = p.__enter__()
+        send_every = batch.session.batch_max_requests
+
         for page in range(pages):
             records = parse_client.get_records(page, RECORD_PER_PAGES)
 
-            # Create kinto batch request
-            with kinto_client.batch() as batch:
-                for record in records:
-                    batch.create_record(data=parse.convert_record(record),
-                                        safe=True)
-                    num_processed += 1
+            for record in records:
+                batch.create_record(data=parse.convert_record(record),
+                                    safe=True)
+                num_processed += 1
 
-            p.update(num_processed)
+                if num_processed % send_every == 0:
+                    try:
+                        batch.session.send()
+                    except KintoException as e:
+                        if e.response['status'] != 412:
+                            raise
+                    finally:
+                        batch.session.reset()
+                        progress.update(num_processed)
 
+        p.__exit__(None, None, None)
 
 if __name__ == '__main__':
     sys.exit(main())
