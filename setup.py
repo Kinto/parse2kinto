@@ -14,7 +14,8 @@ with codecs.open(os.path.join(here, 'CHANGELOG.rst'), encoding='utf-8') as f:
 
 requirements = [
     'kinto-http',
-    'processbar2',
+    'progressbar2',
+    'python-dateutil',
 ]
 
 test_requirements = [

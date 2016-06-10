@@ -1,5 +1,6 @@
 from __future__ import print_function
 import logging
+import math
 import sys
 
 from progressbar import (
@@ -56,7 +57,7 @@ def main(args=None):
     # Count number of objects
     count = parse_client.get_number_of_records()
 
-    pages = int(count / RECORD_PER_PAGES)
+    pages = math.ceil(float(count) / RECORD_PER_PAGES)
     widgets = ['Import: ', Percentage(), ' ', BouncingBar(), ' ', AdaptiveETA()]
 
     print("Importing %d records from %s" % (count, args.parse_class))
@@ -72,8 +73,10 @@ def main(args=None):
             # Create kinto batch request
             with kinto_client.batch() as batch:
                 for record in records:
-                    batch.create_record(data=record)
+                    batch.create_record(data=parse.convert_record(record),
+                                        safe=True)
                     num_processed += 1
+
             p.update(num_processed)
 
 

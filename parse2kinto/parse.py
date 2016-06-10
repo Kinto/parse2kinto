@@ -1,6 +1,11 @@
+import hashlib
 import requests
+import time
+
+from dateutil.parser import parse as dateparser
 from kinto_http import utils
 from six import iteritems
+from uuid import UUID
 
 
 class ParseException(Exception):
@@ -87,3 +92,19 @@ def create_client_from_args(args):
                        app_id=args.parse_app,
                        rest_key=args.parse_rest_key,
                        class_name=args.parse_class)
+
+
+def convert_record(record):
+    kinto_record = record.copy()
+
+    # Handle updateAt
+    updateAt = kinto_record.pop("updatedAt")
+    then = dateparser(updateAt)
+    kinto_record['last_modified'] = int(time.mktime(then.timetuple())*1e3 +
+                                        then.microsecond/1e3)
+
+    # Handle record ID
+    record_id = str(UUID(hashlib.md5(kinto_record['objectId']).hexdigest()))
+    kinto_record['id'] = record_id
+
+    return kinto_record
